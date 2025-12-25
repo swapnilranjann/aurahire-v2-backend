@@ -25,11 +25,12 @@ const authenticateJWT = (req, res, next) => {
 };
 
 // Route to create a job
-router.post('/jobs', authenticateJWT, async (req, res) => {
-  const { category, company, description, location, title, hr_id } = req.body;
+router.post('/', authenticateJWT, async (req, res) => {
+  const { category, company, description, location, title } = req.body;
+  const hr_id = req.user.id; // Get HR ID from authenticated token
 
   // Ensure all required fields are provided
-  if (!category || !company || !description || !location || !title || !hr_id) {
+  if (!category || !company || !description || !location || !title) {
     return res.status(400).json({ error: 'All fields are required.' });
   }
 
@@ -43,12 +44,17 @@ router.post('/jobs', authenticateJWT, async (req, res) => {
 
   try {
     // Execute the query using sequelize.query (raw query)
-    await sequelize.query(query, {
+    const [result] = await sequelize.query(query, {
       replacements: values,  // Use replacements for SQL injection protection
       type: sequelize.QueryTypes.INSERT, // Specify the query type
     });
 
-    res.status(201).json({ message: 'Job created successfully!' });
+    const jobId = result.insertId || result[0]?.insertId;
+
+    res.status(201).json({ 
+      message: 'Job created successfully!',
+      job_id: jobId 
+    });
   } catch (error) {
     console.error('Error creating job:', error);
     res.status(500).json({ error: 'Failed to create job. Please try again.' });
@@ -56,7 +62,7 @@ router.post('/jobs', authenticateJWT, async (req, res) => {
 });
 
 // Route to get all jobs posted by HR user
-router.get('/jobs/my-jobs', authenticateJWT, async (req, res) => {
+router.get('/my-jobs', authenticateJWT, async (req, res) => {
   try {
     const hrId = req.user.id;
 
@@ -72,7 +78,9 @@ router.get('/jobs/my-jobs', authenticateJWT, async (req, res) => {
       type: sequelize.QueryTypes.SELECT,
     });
 
-    res.status(200).json(jobs);
+    // Ensure we always return an array
+    const jobsArray = Array.isArray(jobs) ? jobs : (jobs ? [jobs] : []);
+    res.status(200).json(jobsArray);
   } catch (error) {
     console.error('Error fetching HR jobs:', error);
     res.status(500).json({ error: 'Failed to fetch jobs. Please try again.' });
@@ -80,7 +88,7 @@ router.get('/jobs/my-jobs', authenticateJWT, async (req, res) => {
 });
 
 // Route to update a job (only by the HR who created it)
-router.put('/jobs/:id', authenticateJWT, async (req, res) => {
+router.put('/:id', authenticateJWT, async (req, res) => {
   try {
     const jobId = parseInt(req.params.id);
     const hrId = req.user.id;
@@ -128,7 +136,7 @@ router.put('/jobs/:id', authenticateJWT, async (req, res) => {
 });
 
 // Route to delete a job (only by the HR who created it)
-router.delete('/jobs/:id', authenticateJWT, async (req, res) => {
+router.delete('/:id', authenticateJWT, async (req, res) => {
   try {
     const jobId = parseInt(req.params.id);
     const hrId = req.user.id;

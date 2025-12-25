@@ -4,18 +4,46 @@ export const migrateWorkflow = async () => {
   try {
     console.log("🔄 Starting workflow migration...");
 
-    // Add new columns to applicants table if they don't exist
-    await sequelize.query(`
-      ALTER TABLE applicants 
-      ADD COLUMN IF NOT EXISTS current_stage VARCHAR(50) DEFAULT 'application_check',
-      ADD COLUMN IF NOT EXISTS stage_status VARCHAR(50) DEFAULT 'pending',
-      ADD COLUMN IF NOT EXISTS total_interview_rounds INT DEFAULT 3,
-      ADD COLUMN IF NOT EXISTS rejection_reason TEXT
-    `).catch(err => {
-      if (!err.message.includes('Duplicate column')) {
-        console.error("Error adding columns to applicants:", err);
+    // Check and add columns one by one (MySQL doesn't support IF NOT EXISTS for ADD COLUMN)
+    const columns = [
+      { name: 'current_stage', type: "VARCHAR(50) DEFAULT 'application_check'" },
+      { name: 'stage_status', type: "VARCHAR(50) DEFAULT 'pending'" },
+      { name: 'total_interview_rounds', type: 'INT DEFAULT 3' },
+      { name: 'rejection_reason', type: 'TEXT' }
+    ];
+
+    for (const col of columns) {
+      try {
+        // Check if column exists
+        const results = await sequelize.query(`
+          SELECT COLUMN_NAME 
+          FROM INFORMATION_SCHEMA.COLUMNS 
+          WHERE TABLE_SCHEMA = DATABASE() 
+          AND TABLE_NAME = 'applicants' 
+          AND COLUMN_NAME = ?
+        `, {
+          replacements: [col.name],
+          type: sequelize.QueryTypes.SELECT
+        });
+
+        if (!results || results.length === 0) {
+          // Column doesn't exist, add it
+          await sequelize.query(`
+            ALTER TABLE applicants 
+            ADD COLUMN ${col.name} ${col.type}
+          `);
+          console.log(`✅ Added column: ${col.name}`);
+        } else {
+          console.log(`✅ Column already exists: ${col.name}`);
+        }
+      } catch (err) {
+        if (err.message.includes('Duplicate column') || err.message.includes('already exists')) {
+          console.log(`✅ Column already exists: ${col.name}`);
+        } else {
+          console.error(`Error adding column ${col.name}:`, err.message);
+        }
       }
-    });
+    }
 
     // Create application_stages table
     await sequelize.query(`
@@ -48,17 +76,22 @@ export const migrateWorkflow = async () => {
       }
     });
 
-    // Update existing applications to have initial stage
-    await sequelize.query(`
-      UPDATE applicants 
-      SET current_stage = 'application_check', 
-          stage_status = CASE 
-            WHEN status = 'rejected' THEN 'rejected'
-            WHEN status = 'hired' THEN 'hired'
-            ELSE 'pending'
-          END
-      WHERE current_stage IS NULL OR current_stage = ''
-    `);
+    // Update existing applications to have initial stage (only if columns exist)
+    try {
+      await sequelize.query(`
+        UPDATE applicants 
+        SET current_stage = 'application_check', 
+            stage_status = CASE 
+              WHEN status = 'rejected' THEN 'rejected'
+              WHEN status = 'hired' THEN 'hired'
+              ELSE 'pending'
+            END
+        WHERE current_stage IS NULL OR current_stage = ''
+      `);
+      console.log("✅ Updated existing applications with initial stage");
+    } catch (err) {
+      console.log("⚠️ Could not update applications (columns may not exist yet):", err.message);
+    }
 
     console.log("✅ Workflow migration completed!");
   } catch (error) {

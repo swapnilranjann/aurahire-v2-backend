@@ -1,4 +1,4 @@
-import express from "express";
+import express from 'express';\nimport { verifyToken } from '../../middleware/auth.js';
 import sequelize from "../config/db.js"; // ✅ Import Sequelize instance
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
@@ -7,20 +7,7 @@ dotenv.config();
 const router = express.Router();
 
 // ✅ Middleware to verify JWT token
-const verifyToken = (req, res, next) => {
-  const token = req.headers["authorization"];
-  if (!token) {
-    return res.status(403).json({ error: "Access denied. No token provided." });
-  }
 
-  try {
-    const decoded = jwt.verify(token.split(" ")[1], process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: "Invalid token." });
-  }
-};
 
 // ✅ Apply for a job
 router.post("/:id", verifyToken, async (req, res) => {

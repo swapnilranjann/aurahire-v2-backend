@@ -6,39 +6,40 @@ import { fileURLToPath } from "url";
 import sequelize from "./config/db.js";
 
 // Auth Routes
-import authRoutes from "./routes/authRoutes.js";
-import authRoutesHr from "./routes/authRoutesHr.js";
+import authRoutes from "./routes/auth/authRoutes.js";
+import authRoutesHr from "./routes/auth/authRoutesHr.js";
 
 // Job Routes
-import getAllJobs from "./routes/getAlljobs.js";
-import jobDetails from "./routes/jobDetails.js";
-import applyJob from "./routes/applyJob.js";
-import createJob from "./routes/createJob.js";
+import getAllJobs from "./routes/jobs/getAlljobs.js";
+import jobDetails from "./routes/jobs/jobDetails.js";
+import applyJob from "./routes/jobs/applyJob.js";
+import createJob from "./routes/jobs/createJob.js";
+import jobTests from "./routes/jobs/jobTests.js";
 
 // Profile Routes
-import profile from "./routes/profile.js";
-import hrProfile from "./routes/hrProfile.js";
-import enhancedProfile from "./routes/enhancedProfile.js";
+import profile from "./routes/profile/profile.js";
+import hrProfile from "./routes/profile/hrProfile.js";
+import enhancedProfile from "./routes/profile/enhancedProfile.js";
 
-// New Feature Routes
-import savedJobs from "./routes/savedJobs.js";
-import applicationStatus from "./routes/applicationStatus.js";
-import upload from "./routes/upload.js";
+// Application Routes
+import applicationStatus from "./routes/applications/applicationStatus.js";
 
 // Job Seeker Features
-import resumeBuilder from "./routes/resumeBuilder.js";
-import jobAlerts from "./routes/jobAlerts.js";
-import careerAdvice from "./routes/careerAdvice.js";
-import skillTests from "./routes/skillTests.js";
+import savedJobs from "./routes/jobSeeker/savedJobs.js";
+import jobAlerts from "./routes/jobSeeker/jobAlerts.js";
+import resumeBuilder from "./routes/jobSeeker/resumeBuilder.js";
+import skillTests from "./routes/jobSeeker/skillTests.js";
+import careerAdvice from "./routes/jobSeeker/careerAdvice.js";
 
 // Employer Features
-import resumeSearch from "./routes/resumeSearch.js";
-import recruitmentSolutions from "./routes/recruitmentSolutions.js";
+import resumeSearch from "./routes/employer/resumeSearch.js";
+import recruitmentSolutions from "./routes/employer/recruitmentSolutions.js";
+import applicants from "./routes/employer/applicants.js";
 
-// Other Routes
-import contact from "./routes/contact.js";
-import applicants from "./routes/applicants.js";
-import homeData from "./routes/homeData.js";
+// Common Routes
+import upload from "./routes/common/upload.js";
+import contact from "./routes/common/contact.js";
+import homeData from "./routes/common/homeData.js";
 
 // Import Models for sync
 import SavedJob from "./models/SavedJob.js";
@@ -50,6 +51,8 @@ import Question from "./models/Question.js";
 import RecruitmentPlan from "./models/RecruitmentPlan.js";
 import Application from "./models/Application.js";
 import ApplicationStage from "./models/ApplicationStage.js";
+import JobTest from "./models/JobTest.js";
+import CustomQuestion from "./models/CustomQuestion.js";
 // Note: Job model should be imported if it exists, or we use the 'job' table directly
 
 dotenv.config();
@@ -75,10 +78,11 @@ app.use("/api", authRoutesHr);              // HR signup/login
 // ============================
 // 💼 JOB ROUTES
 // ============================
+app.use("/api/jobs", createJob);            // POST create job, GET/PUT/DELETE my-jobs (HR) - Mount first for specific routes
 app.use("/api/jobs", getAllJobs);           // GET all jobs with filters + categories/locations
 app.use("/api/job", jobDetails);            // GET single job details
 app.use("/api/apply", applyJob);            // POST apply for job
-app.use("/api", createJob);                 // POST create job (HR)
+app.use("/api/job-tests", jobTests);        // Job test management (create tests, add questions)
 
 // ============================
 // 👤 PROFILE ROUTES

@@ -1,4 +1,4 @@
-import express from "express";
+import express from 'express';\nimport { verifyToken } from '../../middleware/auth.js';
 import jwt from "jsonwebtoken";
 import { SkillTest, SkillTestResult } from "../models/SkillTest.js";
 import Question from "../models/Question.js";
@@ -9,20 +9,7 @@ dotenv.config();
 const router = express.Router();
 
 // Middleware to verify JWT token
-const verifyToken = (req, res, next) => {
-  const token = req.headers["authorization"]?.split(" ")[1];
-  if (!token) {
-    return res.status(403).json({ error: "Access denied. No token provided." });
-  }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: "Invalid token." });
-  }
-};
 
 // GET all available skill tests/stacks (public)
 router.get("/", async (req, res) => {
@@ -254,6 +241,41 @@ router.post("/:id/submit", verifyToken, async (req, res) => {
   } catch (error) {
     console.error("Error submitting test:", error);
     res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
+});
+
+// GET user's test results (alias for /results/my-tests)
+router.get("/results", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get best result for each test
+    const [results] = await sequelize.query(`
+      SELECT 
+        r.*,
+        t.title,
+        t.skill_name,
+        t.icon,
+        ROW_NUMBER() OVER (PARTITION BY r.test_id ORDER BY r.score DESC, r.createdAt DESC) as rn
+      FROM skill_test_results r
+      INNER JOIN skill_tests t ON r.test_id = t.id
+      WHERE r.user_id = ?
+    `, {
+      replacements: [userId],
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    // Filter to get only best result per test
+    const bestResults = Array.isArray(results) 
+      ? results.filter((r, index, self) => 
+          index === self.findIndex(t => t.test_id === r.test_id && t.rn === 1)
+        )
+      : [];
+
+    res.json(bestResults);
+  } catch (error) {
+    console.error("Error fetching test results:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 

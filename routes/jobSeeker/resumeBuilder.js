@@ -1,4 +1,4 @@
-import express from "express";
+import express from 'express';\nimport { verifyToken } from '../../middleware/auth.js';
 import jwt from "jsonwebtoken";
 import sequelize from "../config/db.js";
 import Profile from "../models/Profile.js";
@@ -8,20 +8,7 @@ dotenv.config();
 const router = express.Router();
 
 // Middleware to verify JWT token
-const verifyToken = (req, res, next) => {
-  const token = req.headers["authorization"]?.split(" ")[1];
-  if (!token) {
-    return res.status(403).json({ error: "Access denied. No token provided." });
-  }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: "Invalid token." });
-  }
-};
 
 // GET resume data
 router.get("/", verifyToken, async (req, res) => {
@@ -49,6 +36,53 @@ router.get("/", verifyToken, async (req, res) => {
     res.json(profile);
   } catch (error) {
     console.error("Error fetching resume:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// CREATE/UPDATE resume (POST for compatibility)
+router.post("/", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const resumeData = req.body;
+
+    let profile = await Profile.findOne({ where: { user_id: userId } });
+
+    if (!profile) {
+      const [user] = await sequelize.query(
+        `SELECT id, name, email FROM users WHERE id = ?`,
+        { replacements: [userId], type: sequelize.QueryTypes.SELECT }
+      );
+
+      profile = await Profile.create({
+        user_id: userId,
+        name: user?.name || resumeData.name,
+        email: user?.email,
+      });
+    }
+
+    // Update all resume fields
+    await profile.update({
+      name: resumeData.name || profile.name,
+      email: resumeData.email || profile.email,
+      phone: resumeData.phone,
+      photo: resumeData.photo,
+      resume: resumeData.resume,
+      headline: resumeData.headline,
+      summary: resumeData.summary || resumeData.personalInfo?.summary,
+      currentLocation: resumeData.currentLocation || resumeData.personalInfo?.location,
+      experience: resumeData.experience || [],
+      education: resumeData.education || [],
+      skills: resumeData.skills || [],
+      certifications: resumeData.certifications || [],
+      linkedinUrl: resumeData.linkedinUrl,
+      githubUrl: resumeData.githubUrl,
+      portfolioUrl: resumeData.portfolioUrl,
+    });
+
+    res.json({ message: "Resume updated successfully", resume: profile });
+  } catch (error) {
+    console.error("Error updating resume:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

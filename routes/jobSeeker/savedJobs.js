@@ -1,4 +1,4 @@
-import express from "express";
+import express from 'express';\nimport { verifyToken } from '../../middleware/auth.js';
 import jwt from "jsonwebtoken";
 import sequelize from "../config/db.js";
 import SavedJob from "../models/SavedJob.js";
@@ -6,20 +6,7 @@ import SavedJob from "../models/SavedJob.js";
 const router = express.Router();
 
 // Middleware to verify JWT token
-const verifyToken = (req, res, next) => {
-  const token = req.headers["authorization"]?.split(" ")[1];
-  if (!token) {
-    return res.status(403).json({ error: "Access denied. No token provided." });
-  }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: "Invalid token." });
-  }
-};
 
 // ✅ Get all saved jobs for a user
 router.get("/", verifyToken, async (req, res) => {

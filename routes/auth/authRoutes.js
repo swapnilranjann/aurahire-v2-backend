@@ -13,7 +13,7 @@ const generateAccessToken = (user) => {
   return jwt.sign(
     { id: user.id, role: user.role },
     process.env.JWT_SECRET,
-    { expiresIn: "15m" } // Short-lived access token
+    { expiresIn: "30d" } // Access token valid for 30 days
   );
 };
 
@@ -21,7 +21,7 @@ const generateRefreshToken = (user) => {
   return jwt.sign(
     { id: user.id, role: user.role },
     process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh",
-    { expiresIn: "7d" } // Long-lived refresh token
+    { expiresIn: "30d" } // Refresh token valid for 30 days
   );
 };
 

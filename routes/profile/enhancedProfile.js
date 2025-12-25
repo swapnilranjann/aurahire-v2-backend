@@ -1,4 +1,4 @@
-import express from "express";
+import express from 'express';\nimport { verifyToken } from '../../middleware/auth.js';
 import jwt from "jsonwebtoken";
 import sequelize from "../config/db.js";
 import Profile from "../models/Profile.js";
@@ -6,20 +6,7 @@ import Profile from "../models/Profile.js";
 const router = express.Router();
 
 // Middleware to verify JWT token
-const verifyToken = (req, res, next) => {
-  const token = req.headers["authorization"]?.split(" ")[1];
-  if (!token) {
-    return res.status(403).json({ error: "Access denied. No token provided." });
-  }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: "Invalid token." });
-  }
-};
 
 // Calculate profile completion percentage
 const calculateCompletion = (profile) => {
@@ -312,6 +299,24 @@ router.put("/skills", verifyToken, async (req, res) => {
     res.json({ message: "Skills updated successfully", skills });
   } catch (error) {
     console.error("Error updating skills:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// ✅ Get profile completion percentage
+router.get("/completion", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    let profile = await Profile.findOne({ where: { user_id: userId } });
+
+    if (!profile) {
+      return res.json({ completion: 0 });
+    }
+
+    const completion = calculateCompletion(profile);
+    res.json({ completion });
+  } catch (error) {
+    console.error("Error fetching completion:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

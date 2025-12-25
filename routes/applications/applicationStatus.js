@@ -1,4 +1,4 @@
-import express from "express";
+import express from 'express';\nimport { verifyToken } from '../../middleware/auth.js';
 import jwt from "jsonwebtoken";
 import sequelize from "../config/db.js";
 import { sendApplicationStatusEmail } from "../utils/emailService.js";
@@ -7,20 +7,7 @@ import ApplicationStage from "../models/ApplicationStage.js";
 const router = express.Router();
 
 // Middleware to verify JWT token
-const verifyToken = (req, res, next) => {
-  const token = req.headers["authorization"]?.split(" ")[1];
-  if (!token) {
-    return res.status(403).json({ error: "Access denied. No token provided." });
-  }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: "Invalid token." });
-  }
-};
 
 // ✅ Get all applications for a user (Job Seeker)
 router.get("/my-applications", verifyToken, async (req, res) => {
@@ -29,7 +16,8 @@ router.get("/my-applications", verifyToken, async (req, res) => {
 
     const [applications] = await sequelize.query(
       `SELECT a.id, a.job_id, a.status, a.notes, a.created_on,
-              a.current_stage, a.stage_status,
+              COALESCE(a.current_stage, 'application_check') as current_stage, 
+              COALESCE(a.stage_status, 'pending') as stage_status,
               j.title, j.company, j.location, j.category
        FROM applicants a
        JOIN job j ON a.job_id = j.id
@@ -148,7 +136,8 @@ router.get("/hr/applicants", verifyToken, async (req, res) => {
 
     let query = `
       SELECT a.id, a.user_id, a.email, a.name, a.job_id, a.status, a.notes, a.created_on,
-             a.current_stage, a.stage_status,
+             COALESCE(a.current_stage, 'application_check') as current_stage, 
+             COALESCE(a.stage_status, 'pending') as stage_status,
              j.title as job_title, j.company
       FROM applicants a
       JOIN job j ON a.job_id = j.id

@@ -25,13 +25,30 @@ import savedJobs from "./routes/savedJobs.js";
 import applicationStatus from "./routes/applicationStatus.js";
 import upload from "./routes/upload.js";
 
+// Job Seeker Features
+import resumeBuilder from "./routes/resumeBuilder.js";
+import jobAlerts from "./routes/jobAlerts.js";
+import careerAdvice from "./routes/careerAdvice.js";
+import skillTests from "./routes/skillTests.js";
+
+// Employer Features
+import resumeSearch from "./routes/resumeSearch.js";
+import recruitmentSolutions from "./routes/recruitmentSolutions.js";
+
 // Other Routes
 import contact from "./routes/contact.js";
 import applicants from "./routes/applicants.js";
+import homeData from "./routes/homeData.js";
 
 // Import Models for sync
 import SavedJob from "./models/SavedJob.js";
 import Profile from "./models/Profile.js";
+import JobAlert from "./models/JobAlert.js";
+import CareerAdvice from "./models/CareerAdvice.js";
+import { SkillTest, SkillTestResult } from "./models/SkillTest.js";
+import Question from "./models/Question.js";
+import RecruitmentPlan from "./models/RecruitmentPlan.js";
+// Note: Job model should be imported if it exists, or we use the 'job' table directly
 
 dotenv.config();
 
@@ -76,10 +93,25 @@ app.use("/api/applications", applicationStatus); // Application status tracking
 app.use("/api/upload", upload);             // File upload (resume/photo)
 
 // ============================
+// 👨‍💼 JOB SEEKER FEATURES
+// ============================
+app.use("/api/resume", resumeBuilder);      // Resume builder (create, update, download)
+app.use("/api/job-alerts", jobAlerts);      // Job alerts (create, manage alerts)
+app.use("/api/career-advice", careerAdvice); // Career advice articles
+app.use("/api/skill-tests", skillTests);    // Skill tests (take tests, view results)
+
+// ============================
+// 🏢 EMPLOYER FEATURES
+// ============================
+app.use("/api/resume-search", resumeSearch); // Search resumes/candidates (HR)
+app.use("/api/recruitment", recruitmentSolutions); // Recruitment solutions & pricing
+
+// ============================
 // 📞 OTHER ROUTES
 // ============================
 app.use("/api/contact", contact);           // Contact form
 app.use("/api", applicants);                // Get applicants (HR)
+app.use("/api/home", homeData);             // Home page data (featured jobs, companies, news)
 
 // ============================
 // 🏥 HEALTH CHECK
@@ -94,10 +126,23 @@ app.get("/api/health", (req, res) => {
 });
 
 // ============================
-// 🔄 DATABASE SYNC
+// 🔄 DATABASE SYNC & SEED DATA
 // ============================
 sequelize.sync({ alter: true })
-  .then(() => console.log("✅ Database Synced"))
+  .then(async () => {
+    console.log("✅ Database Synced");
+    // Seed initial data
+    const { seedCareerAdvice, seedSkillTests, seedRecruitmentPlans } = await import("./utils/seedData.js");
+    const { seedQuestions } = await import("./utils/seedQuestions.js");
+    
+    await seedCareerAdvice();
+    await seedSkillTests();
+    await seedRecruitmentPlans();
+    
+    // Seed questions after tests are created
+    console.log("🌱 Seeding questions (this may take a while)...");
+    await seedQuestions();
+  })
   .catch(err => console.error("❌ Sync Error:", err));
 
 const PORT = process.env.PORT || 15000;

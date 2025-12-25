@@ -48,6 +48,8 @@ import CareerAdvice from "./models/CareerAdvice.js";
 import { SkillTest, SkillTestResult } from "./models/SkillTest.js";
 import Question from "./models/Question.js";
 import RecruitmentPlan from "./models/RecruitmentPlan.js";
+import Application from "./models/Application.js";
+import ApplicationStage from "./models/ApplicationStage.js";
 // Note: Job model should be imported if it exists, or we use the 'job' table directly
 
 dotenv.config();
@@ -131,6 +133,11 @@ app.get("/api/health", (req, res) => {
 sequelize.sync({ alter: true })
   .then(async () => {
     console.log("✅ Database Synced");
+    
+    // Run workflow migration
+    const { migrateWorkflow } = await import("./utils/migrateWorkflow.js");
+    await migrateWorkflow();
+    
     // Seed initial data
     const { seedCareerAdvice, seedSkillTests, seedRecruitmentPlans } = await import("./utils/seedData.js");
     const { seedQuestions } = await import("./utils/seedQuestions.js");

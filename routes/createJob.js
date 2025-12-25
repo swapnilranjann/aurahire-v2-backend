@@ -55,4 +55,115 @@ router.post('/jobs', authenticateJWT, async (req, res) => {
   }
 });
 
+// Route to get all jobs posted by HR user
+router.get('/jobs/my-jobs', authenticateJWT, async (req, res) => {
+  try {
+    const hrId = req.user.id;
+
+    const query = `
+      SELECT id, category, company, description, location, title, hr_id, created_on
+      FROM job
+      WHERE hr_id = ?
+      ORDER BY created_on DESC
+    `;
+
+    const [jobs] = await sequelize.query(query, {
+      replacements: [hrId],
+      type: sequelize.QueryTypes.SELECT,
+    });
+
+    res.status(200).json(jobs);
+  } catch (error) {
+    console.error('Error fetching HR jobs:', error);
+    res.status(500).json({ error: 'Failed to fetch jobs. Please try again.' });
+  }
+});
+
+// Route to update a job (only by the HR who created it)
+router.put('/jobs/:id', authenticateJWT, async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id);
+    const hrId = req.user.id;
+    const { category, company, description, location, title } = req.body;
+
+    // Validate required fields
+    if (!category || !company || !description || !location || !title) {
+      return res.status(400).json({ error: 'All fields are required.' });
+    }
+
+    // First, check if job exists and belongs to this HR
+    const [existingJob] = await sequelize.query(
+      `SELECT id, hr_id FROM job WHERE id = ?`,
+      {
+        replacements: [jobId],
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+
+    if (!existingJob) {
+      return res.status(404).json({ error: 'Job not found.' });
+    }
+
+    if (existingJob.hr_id !== hrId) {
+      return res.status(403).json({ error: 'Access denied. You can only edit your own jobs.' });
+    }
+
+    // Update the job
+    const updateQuery = `
+      UPDATE job
+      SET category = ?, company = ?, description = ?, location = ?, title = ?
+      WHERE id = ? AND hr_id = ?
+    `;
+
+    await sequelize.query(updateQuery, {
+      replacements: [category, company, description, location, title, jobId, hrId],
+      type: sequelize.QueryTypes.UPDATE,
+    });
+
+    res.status(200).json({ message: 'Job updated successfully!' });
+  } catch (error) {
+    console.error('Error updating job:', error);
+    res.status(500).json({ error: 'Failed to update job. Please try again.' });
+  }
+});
+
+// Route to delete a job (only by the HR who created it)
+router.delete('/jobs/:id', authenticateJWT, async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id);
+    const hrId = req.user.id;
+
+    // First, check if job exists and belongs to this HR
+    const [existingJob] = await sequelize.query(
+      `SELECT id, hr_id FROM job WHERE id = ?`,
+      {
+        replacements: [jobId],
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+
+    if (!existingJob) {
+      return res.status(404).json({ error: 'Job not found.' });
+    }
+
+    if (existingJob.hr_id !== hrId) {
+      return res.status(403).json({ error: 'Access denied. You can only delete your own jobs.' });
+    }
+
+    // Delete the job
+    await sequelize.query(
+      `DELETE FROM job WHERE id = ? AND hr_id = ?`,
+      {
+        replacements: [jobId, hrId],
+        type: sequelize.QueryTypes.DELETE,
+      }
+    );
+
+    res.status(200).json({ message: 'Job deleted successfully!' });
+  } catch (error) {
+    console.error('Error deleting job:', error);
+    res.status(500).json({ error: 'Failed to delete job. Please try again.' });
+  }
+});
+
 export default router;

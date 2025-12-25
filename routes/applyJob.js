@@ -65,9 +65,9 @@ router.post("/:id", verifyToken, async (req, res) => {
       return res.status(400).json({ error: "You have already applied for this job" });
     }
 
-    // ✅ Store application in the applicants table with hr_id and status
+    // ✅ Store application in the applicants table with hr_id, status, and initial stage
     await sequelize.query(
-      "INSERT INTO swapnil_db.applicants (user_id, email, name, job_id, created_on, hr_id, status) VALUES (?, ?, ?, ?, NOW(), ?, 'pending')",
+      "INSERT INTO swapnil_db.applicants (user_id, email, name, job_id, created_on, hr_id, status, current_stage, stage_status) VALUES (?, ?, ?, ?, NOW(), ?, 'pending', 'application_check', 'pending')",
       {
         replacements: [user_id, email, name, parsedJobId, hr_id],
         type: sequelize.QueryTypes.INSERT,

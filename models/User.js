@@ -9,6 +9,12 @@ const User = sequelize.define(
     email: { type: DataTypes.STRING, allowNull: false, unique: true },
     password: { type: DataTypes.STRING, allowNull: false },
     role: { type: DataTypes.ENUM("user", "hr"), allowNull: false },
+    isEmailVerified: { type: DataTypes.BOOLEAN, defaultValue: false },
+    emailVerificationToken: { type: DataTypes.STRING, allowNull: true },
+    emailVerificationExpires: { type: DataTypes.DATE, allowNull: true },
+    passwordResetToken: { type: DataTypes.STRING, allowNull: true },
+    passwordResetExpires: { type: DataTypes.DATE, allowNull: true },
+    refreshToken: { type: DataTypes.STRING, allowNull: true },
   },
   { timestamps: true }
 );

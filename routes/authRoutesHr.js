@@ -1,46 +1,75 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js'; // Sequelize model for User
+import { v4 as uuidv4 } from "uuid";
+import User from '../models/User.js';
+import { sendVerificationEmail } from "../utils/emailService.js";
 
 const router = express.Router();
 
+// Generate tokens
+const generateAccessToken = (user) => {
+  return jwt.sign(
+    { id: user.id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" }
+  );
+};
+
+const generateRefreshToken = (user) => {
+  return jwt.sign(
+    { id: user.id, role: user.role },
+    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh",
+    { expiresIn: "7d" }
+  );
+};
+
 // ✅ Register HR User (Signup) at /signup-hr
 router.post("/signup-hr", async (req, res) => {
-  const { name, email, password, phone, photo, resume } = req.body;
+  const { name, email, password } = req.body;
 
   try {
-    // Check if the user already exists using Sequelize
     const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) return res.status(400).json("User already exists");
+    if (existingUser) return res.status(400).json({ error: "User already exists" });
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new HR user using Sequelize
+    // Generate email verification token
+    const emailVerificationToken = uuidv4();
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
     const newUser = await User.create({
       name,
       email,
       password: hashedPassword,
-      role: 'hr', // Default role for HR users
+      role: 'hr',
+      isEmailVerified: false,
+      emailVerificationToken,
+      emailVerificationExpires,
     });
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: newUser.id, role: 'hr' },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
+    // Send verification email
+    await sendVerificationEmail(email, name, emailVerificationToken);
 
-    // Response without sending the password
+    const accessToken = generateAccessToken(newUser);
+    const refreshToken = generateRefreshToken(newUser);
+
+    await newUser.update({ refreshToken });
+
     const userResponse = {
       id: newUser.id,
       name: newUser.name,
       email: newUser.email,
-      role: newUser.role
+      role: newUser.role,
+      isEmailVerified: newUser.isEmailVerified,
     };
 
-    res.status(201).json({ message: "Signup successful", token, user: userResponse });
+    res.status(201).json({ 
+      message: "Signup successful. Please check your email to verify your account.", 
+      accessToken,
+      refreshToken,
+      user: userResponse 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -51,32 +80,72 @@ router.post("/login-hr", async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Check if user exists in the database using Sequelize
     const user = await User.findOne({ where: { email } });
-    if (!user) return res.status(404).json("User not found");
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    // Compare password
+    // ✅ Verify user is actually an HR
+    if (user.role !== 'hr') {
+      return res.status(403).json({ error: "Access denied. Not an HR account." });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json("Invalid credentials");
+    if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: user.id, role: 'hr' }, // Store the user ID in the JWT payload
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
 
-    // Response without sending the password
+    await user.update({ refreshToken });
+
     const userResponse = {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: 'hr'
+      role: user.role,
+      isEmailVerified: user.isEmailVerified,
     };
 
-    res.json({ message: "Login successful", token, user: userResponse });
+    res.json({ 
+      message: "Login successful", 
+      accessToken,
+      refreshToken,
+      user: userResponse 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ Refresh Token for HR
+router.post("/refresh-token-hr", async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(401).json({ error: "Refresh token required" });
+  }
+
+  try {
+    const decoded = jwt.verify(
+      refreshToken, 
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh"
+    );
+
+    const user = await User.findByPk(decoded.id);
+
+    if (!user || user.refreshToken !== refreshToken || user.role !== 'hr') {
+      return res.status(403).json({ error: "Invalid refresh token" });
+    }
+
+    const newAccessToken = generateAccessToken(user);
+    const newRefreshToken = generateRefreshToken(user);
+
+    await user.update({ refreshToken: newRefreshToken });
+
+    res.json({ 
+      accessToken: newAccessToken, 
+      refreshToken: newRefreshToken 
+    });
+  } catch (err) {
+    return res.status(403).json({ error: "Invalid or expired refresh token" });
   }
 });
 

@@ -52,9 +52,22 @@ router.post("/:id", verifyToken, async (req, res) => {
 
     const hr_id = job.hr_id;
 
-    // ✅ Store application in the applicants table with hr_id
+    // Check if already applied
+    const [existingApplication] = await sequelize.query(
+      "SELECT id FROM swapnil_db.applicants WHERE user_id = ? AND job_id = ?",
+      {
+        replacements: [user_id, parsedJobId],
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+
+    if (existingApplication) {
+      return res.status(400).json({ error: "You have already applied for this job" });
+    }
+
+    // ✅ Store application in the applicants table with hr_id and status
     await sequelize.query(
-      "INSERT INTO swapnil_db.applicants (user_id, email, name, job_id, created_on, hr_id) VALUES (?, ?, ?, ?, NOW(), ?)",
+      "INSERT INTO swapnil_db.applicants (user_id, email, name, job_id, created_on, hr_id, status) VALUES (?, ?, ?, ?, NOW(), ?, 'pending')",
       {
         replacements: [user_id, email, name, parsedJobId, hr_id],
         type: sequelize.QueryTypes.INSERT,

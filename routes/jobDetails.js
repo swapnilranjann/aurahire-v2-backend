@@ -23,8 +23,8 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-// ✅ Fix: Use `sequelize.query()` instead of `db.execute()`
-router.get("/:id", verifyToken, async (req, res) => {
+// ✅ Public route - no auth required to view job details
+router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     console.log("Job ID received:", id);
